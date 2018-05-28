@@ -5,6 +5,7 @@ import java.util.Properties;
 import javax.jms.ConnectionFactory;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
+import org.apache.qpid.jms.JmsConnectionFactory;
 
 import com.rabbitmq.jms.admin.RMQConnectionFactory;
 
@@ -29,4 +30,9 @@ public class JMSConnectionFactory {
 		return factory;
 	}
 
+	public static ConnectionFactory getQpidFactory(Properties properties) {
+		JmsConnectionFactory factory = new JmsConnectionFactory(properties.getProperty("username"), properties.getProperty("password"), properties.getProperty("uri"));
+		return factory;
+	}
+	
 }

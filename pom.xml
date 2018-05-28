@@ -14,20 +14,28 @@
 			<artifactId>geronimo-jms_1.1_spec</artifactId>
 			<version>1.1.1</version>
 		</dependency>
-		
+
 		<!-- rabbitmq -->
 		<dependency>
 			<groupId>com.rabbitmq.jms</groupId>
 			<artifactId>rabbitmq-jms</artifactId>
 			<version>1.9.0</version>
 		</dependency>
-		
+
 		<!-- activemq -->
 		<dependency>
 			<groupId>org.apache.activemq</groupId>
 			<artifactId>activemq-client</artifactId>
 			<version>5.15.3</version>
 		</dependency>
+
+		<!-- qpid -->
+		<dependency>
+			<groupId>org.apache.qpid</groupId>
+			<artifactId>qpid-jms-client</artifactId>
+			<version>0.32.0</version>
+		</dependency>
+
 	</dependencies>
 
 

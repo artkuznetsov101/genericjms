@@ -11,10 +11,6 @@ import com.rabbitmq.jms.admin.RMQConnectionFactory;
 
 public class JMSConnectionFactory {
 
-	enum MessageType {
-		STRING, BYTES
-	}
-
 	public static ConnectionFactory getActiveMQFactory(Properties properties) {
 		ActiveMQConnectionFactory factory = new ActiveMQConnectionFactory(properties.getProperty("uri"));
 		return factory;
@@ -31,8 +27,9 @@ public class JMSConnectionFactory {
 	}
 
 	public static ConnectionFactory getQpidFactory(Properties properties) {
-		JmsConnectionFactory factory = new JmsConnectionFactory(properties.getProperty("username"), properties.getProperty("password"), properties.getProperty("uri"));
+		JmsConnectionFactory factory = new JmsConnectionFactory(properties.getProperty("username"),
+				properties.getProperty("password"), properties.getProperty("uri"));
 		return factory;
 	}
-	
+
 }

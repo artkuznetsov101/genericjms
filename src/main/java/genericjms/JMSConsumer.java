@@ -1,6 +1,6 @@
 package genericjms;
 
-import java.util.UUID;
+import java.security.InvalidParameterException;
 
 import javax.jms.BytesMessage;
 import javax.jms.Connection;
@@ -12,49 +12,104 @@ import javax.jms.MessageConsumer;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 
-import genericjms.JMSConnectionFactory.MessageType;
+import genericjms.JMSDestinationFactory.JMSDestination;
 
-public class JMSConsumer implements Runnable {
+public class JMSConsumer implements Runnable, AutoCloseable {
 
 	private Connection connection;
 	private Session session;
 	private Destination destination;
 	private MessageConsumer consumer;
-	private MessageType type;
+	private boolean isTransacted;
 
-	public JMSConsumer(ConnectionFactory factory, String queue, MessageType type) throws JMSException {
+	public JMSConsumer(ConnectionFactory factory, JMSDestination dest, boolean isTransacted) throws JMSException {
+		this.isTransacted = isTransacted;
+
 		connection = factory.createConnection();
-		session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-		destination = session.createQueue(queue);
-		consumer = session.createConsumer(destination);
-		this.type = type;
-
 		connection.start();
+		session = connection.createSession(isTransacted, Session.AUTO_ACKNOWLEDGE);
+		switch (dest.type) {
+		case QUEUE:
+			destination = session.createQueue(dest.name);
+			break;
+		case TOPIC:
+			destination = session.createTopic(dest.name);
+			break;
+		}
+		consumer = session.createConsumer(destination);
 	}
 
-	public void run() {
-		Message message;
+	public JMSMessage poll(long timeout) throws JMSException {
+		Message msg;
+		JMSMessage message;
+		byte[] data;
 		try {
-			while (!Thread.currentThread().isInterrupted()) {
-				message = consumer.receive();
-				if (message != null) {
+			if ((msg = consumer.receive(timeout)) != null) {
+				switch (JMSMessage.MessageType.valueOf(msg.getJMSType())) {
+				case BYTES:
+					data = new byte[(int) ((BytesMessage) msg).getBodyLength()];
+					((BytesMessage) msg).readBytes(data);
+					message = new JMSMessage(data);
+					break;
+				case TEXT:
+					message = new JMSMessage(((TextMessage) msg).getText());
+					break;
+				default:
+					throw new InvalidParameterException();
+				}
+				System.out.println("receive: " + message);
+				if (isTransacted)
+					session.commit();
+				return message;
+			}
+		} catch (JMSException ex) {
+			ex.printStackTrace();
+			if (isTransacted)
+				try {
+					session.rollback();
+				} catch (JMSException e) {
+					e.printStackTrace();
+				}
+		}
+		return null;
+	}
 
-					switch (type) {
+	@Override
+	public void run() {
+		Message msg;
+		JMSMessage message;
+		byte[] data;
+		while (!Thread.currentThread().isInterrupted()) {
+			try {
+				if ((msg = consumer.receive()) != null) {
+					switch (JMSMessage.MessageType.valueOf(msg.getJMSType())) {
 					case BYTES:
-						// !!! raw cast !!!
-						System.out.println("receive: " + ((BytesMessage) message).getBodyLength() + " " + type.name());
+						data = new byte[(int) ((BytesMessage) msg).getBodyLength()];
+						((BytesMessage) msg).readBytes(data);
+						message = new JMSMessage(data);
 						break;
-					case STRING:
-						// !!! raw cast !!!
-						System.out.println("receive: " + ((TextMessage) message).getText() + " " + type.name());
+					case TEXT:
+						message = new JMSMessage(((TextMessage) msg).getText());
 						break;
+					default:
+						throw new InvalidParameterException();
 					}
+					System.out.println("receive: " + message);
+					if (isTransacted)
+						session.commit();
+				}
+			} catch (JMSException ex) {
+				if (ex.getCause() instanceof InterruptedException) {
+
+				} else {
+					ex.printStackTrace();
 				}
 			}
-		} catch (JMSException e) {
-			e.printStackTrace();
 		}
+	}
 
+	@Override
+	public void close() {
 		try {
 			consumer.close();
 			session.close();

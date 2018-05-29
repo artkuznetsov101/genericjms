@@ -3,90 +3,60 @@ package genericjms;
 import java.util.Properties;
 
 import javax.jms.ConnectionFactory;
-import javax.jms.JMSException;
+
+import genericjms.JMSDestinationFactory.JMSDestination;
 
 public class Main {
 
-	public static void main(String[] args) throws InterruptedException, JMSException {
+	public static void main(String[] args) throws Exception {
 
-		Thread thread;
+		// set destination
+		JMSDestination destination = JMSDestinationFactory.getJMSDestinationQueue("test");
+		// set text message
+		JMSMessage textMessage = new JMSMessage("test message");
+		// set bytes message
+		JMSMessage bytesMessage = new JMSMessage("test message".getBytes());
+
+		// different brokers need different connection attributes
 		Properties properties = new Properties();
-		ConnectionFactory factory;
-		JMSProducer producer;
-		JMSConsumer consumer;
 
-		// user set destination
-		String queue = "test";
+		// set activemq broker
+		properties.setProperty("uri", "failover://(tcp://localhost:61616)");
 
-		// user set message type
-		JMSConnectionFactory.MessageType type = JMSConnectionFactory.MessageType.STRING;
+		// set rabbitmq broker
+		// properties.clear();
+		// properties.setProperty("username", "test");
+		// properties.setProperty("password", "test");
+		// properties.setProperty("host", "localhost");
+		// properties.setProperty("port", "5672");
+		// properties.setProperty("virtualHost", "/");
 
-		// user select rabbitmq
+		// set qpid broker
+		// properties.clear();
+		// properties.setProperty("username", "guest");
+		// properties.setProperty("password", "guest");
+		// properties.setProperty("uri", "amqp://localhost:5672");
 
-		// different brokers need different connection attributes
-		properties = new Properties();
-		properties.setProperty("username", "test");
-		properties.setProperty("password", "test");
-		properties.setProperty("host", "10.168.45.49");
-		properties.setProperty("port", "5672");
-		properties.setProperty("virtualHost", "/");
+		// get proper connection factory
+		ConnectionFactory factory = JMSConnectionFactory.getActiveMQFactory(properties);
 
-		// get connection factory
-		factory = JMSConnectionFactory.getRabbitMQFactory(properties);
+		// send: pass factory, destination, transaction mode
+		try (JMSProducer prod = new JMSProducer(factory, destination, true)) {
+			prod.send(textMessage);
+			prod.send(bytesMessage);
+		}
 
-		// pass factory, destination, message type to producer class for message sending
-		producer = new JMSProducer(factory, queue, type);
-		thread = new Thread(producer);
-		thread.start();
+		// poll receive: pass factory, destination, transaction mode
+		try (JMSConsumer consumer = new JMSConsumer(factory, destination, true)) {
+			textMessage = consumer.poll(100);
+		}
 
-		// pass factory, destination, message to consumer class for message receiving
-		consumer = new JMSConsumer(factory, queue, type);
-		thread = new Thread(consumer);
-		thread.start();
-		Thread.sleep(5000);
-		thread.interrupt();
-
-		// user select activemq
-
-		// different brokers need different connection attributes
-		properties.setProperty("uri", "failover://(tcp://10.168.45.49:61616)");
-
-		// get connection factory
-		factory = JMSConnectionFactory.getActiveMQFactory(properties);
-
-		// pass factory, destination, message type to producer class for message sending
-		producer = new JMSProducer(factory, queue, type);
-		thread = new Thread(producer);
-		thread.start();
-
-		// pass factory, destination, message to consumer class for message receiving
-		consumer = new JMSConsumer(factory, queue, type);
-		thread = new Thread(consumer);
-		thread.start();
-		Thread.sleep(5000);
-		thread.interrupt();
-
-		// user select qpid
-
-		// different brokers need different connection attributes
-		properties.clear();
-		properties.setProperty("username", "guest");
-		properties.setProperty("password", "guest");
-		properties.setProperty("uri", "amqp://localhost:5672");
-
-		// get connection factory
-		factory = JMSConnectionFactory.getQpidFactory(properties);
-
-		// pass factory, destination, message type to producer class for message sending
-		producer = new JMSProducer(factory, queue, type);
-		thread = new Thread(producer);
-		thread.start();
-
-		// pass factory, destination, message to consumer class for message receiving
-		consumer = new JMSConsumer(factory, queue, type);
-		thread = new Thread(consumer);
-		thread.start();
-		Thread.sleep(5000);
-		thread.interrupt();
+		// thread receive: pass factory, destination, transaction mode
+		try (JMSConsumer consumer = new JMSConsumer(factory, destination, true)) {
+			Thread thread = new Thread(consumer);
+			thread.start();
+			Thread.sleep(5000);
+			thread.interrupt();
+		}
 	}
 }

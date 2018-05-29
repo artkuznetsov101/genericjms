@@ -1,7 +1,6 @@
 package genericjms;
 
-import java.util.UUID;
-
+import javax.jms.BytesMessage;
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.Destination;
@@ -11,39 +10,56 @@ import javax.jms.MessageProducer;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 
-import genericjms.JMSConnectionFactory.MessageType;
+import genericjms.JMSDestinationFactory.JMSDestination;;
 
-public class JMSProducer implements Runnable {
+public class JMSProducer implements AutoCloseable {
 
 	private Connection connection;
 	private Session session;
 	private Destination destination;
 	private MessageProducer producer;
-	private MessageType type;
+	private boolean isTransacted;
 
-	public JMSProducer(ConnectionFactory factory, String queue, MessageType type) throws JMSException {
+	public JMSProducer(ConnectionFactory factory, JMSDestination dest, boolean isTransacted) throws JMSException {
+		this.isTransacted = isTransacted;
+
 		connection = factory.createConnection();
-		session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-		destination = session.createQueue(queue);
+		connection.start();
+		session = connection.createSession(isTransacted, Session.AUTO_ACKNOWLEDGE);
+		switch (dest.type) {
+		case QUEUE:
+			destination = session.createQueue(dest.name);
+			break;
+		case TOPIC:
+			destination = session.createTopic(dest.name);
+			break;
+		}
 		producer = session.createProducer(destination);
-		this.type = type;
 	}
 
-	public void run() {
+	public void send(JMSMessage msg) throws JMSException {
+		Message message = null;
+		switch (msg.type) {
+		case BYTES:
+			message = session.createBytesMessage();
+			message.setJMSType(JMSMessage.MessageType.BYTES.name());
+			((BytesMessage) message).writeBytes(msg.data);
+			break;
+		case TEXT:
+			message = session.createTextMessage();
+			message.setJMSType(JMSMessage.MessageType.TEXT.name());
+			((TextMessage) message).setText(msg.text);
+			break;
+		}
+		producer.send(destination, message);
+		if (isTransacted)
+			session.commit();
+		System.out.println("send: " + msg);
+	}
+
+	@Override
+	public void close() {
 		try {
-			Message message = null;
-			switch (type) {
-			case BYTES:
-				message = session.createBytesMessage();
-				break;
-			case STRING:
-				message = session.createTextMessage("test message " + UUID.randomUUID().toString());
-				break;
-			}
-
-			producer.send(message);
-			System.out.println("send: " + message.getJMSMessageID() + " " + type.name());
-
 			producer.close();
 			session.close();
 			connection.close();

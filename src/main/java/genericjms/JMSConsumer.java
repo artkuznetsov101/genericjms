@@ -11,7 +11,9 @@ import javax.jms.Message;
 import javax.jms.MessageConsumer;
 import javax.jms.Session;
 import javax.jms.TextMessage;
+import javax.jms.Topic;
 
+import genericjms.JMSDestinationFactory.DestinationType;
 import genericjms.JMSDestinationFactory.JMSDestination;
 
 public class JMSConsumer implements Runnable, AutoCloseable {
@@ -22,29 +24,34 @@ public class JMSConsumer implements Runnable, AutoCloseable {
 	private MessageConsumer consumer;
 	private boolean isTransacted;
 
-	public JMSConsumer(ConnectionFactory factory, JMSDestination dest, boolean isTransacted) throws JMSException {
+	public JMSConsumer(ConnectionFactory factory, JMSDestination dest, String clientId, boolean isTransacted, boolean isDurable, String durableSubscriptionName) throws JMSException {
 		this.isTransacted = isTransacted;
 
 		connection = factory.createConnection();
-		connection.start();
+		if (clientId != null)
+			connection.setClientID(clientId);
+		
 		session = connection.createSession(isTransacted, Session.AUTO_ACKNOWLEDGE);
-		switch (dest.type) {
-		case QUEUE:
-			destination = session.createQueue(dest.name);
-			break;
-		case TOPIC:
+
+		if (dest.type == DestinationType.TOPIC)
 			destination = session.createTopic(dest.name);
-			break;
-		}
-		consumer = session.createConsumer(destination);
+		else
+			destination = session.createQueue(dest.name);
+
+		if (dest.type == DestinationType.TOPIC && isDurable)
+			consumer = session.createDurableSubscriber((Topic) destination, durableSubscriptionName);
+		else
+			consumer = session.createConsumer(destination);
+
+		connection.start();
 	}
 
-	public JMSMessage poll(long timeout) throws JMSException {
+	public JMSMessage poll() throws JMSException {
 		Message msg;
 		JMSMessage message;
 		byte[] data;
 		try {
-			if ((msg = consumer.receive(timeout)) != null) {
+			if ((msg = consumer.receiveNoWait()) != null) {
 				switch (JMSMessage.MessageType.valueOf(msg.getJMSType())) {
 				case BYTES:
 					data = new byte[(int) ((BytesMessage) msg).getBodyLength()];

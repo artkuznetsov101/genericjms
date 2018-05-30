@@ -10,6 +10,7 @@ import javax.jms.MessageProducer;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 
+import genericjms.JMSDestinationFactory.DestinationType;
 import genericjms.JMSDestinationFactory.JMSDestination;;
 
 public class JMSProducer implements AutoCloseable {
@@ -24,17 +25,16 @@ public class JMSProducer implements AutoCloseable {
 		this.isTransacted = isTransacted;
 
 		connection = factory.createConnection();
-		connection.start();
 		session = connection.createSession(isTransacted, Session.AUTO_ACKNOWLEDGE);
-		switch (dest.type) {
-		case QUEUE:
-			destination = session.createQueue(dest.name);
-			break;
-		case TOPIC:
+		
+		if (dest.type == DestinationType.TOPIC)
 			destination = session.createTopic(dest.name);
-			break;
-		}
+		else
+			destination = session.createQueue(dest.name);
+		
 		producer = session.createProducer(destination);
+		
+		connection.start();	
 	}
 
 	public void send(JMSMessage msg) throws JMSException {

@@ -10,8 +10,12 @@ public class Main {
 
 	public static void main(String[] args) throws Exception {
 
+		//must be set for topic DurableConsumer
+		String clientId = "client-id";
+		String durableSubscriptionName = "my-subscription";
+		
 		// set destination
-		JMSDestination destination = JMSDestinationFactory.getJMSDestinationQueue("test");
+		JMSDestination destination = JMSDestinationFactory.getJMSDestinationTopic("test");
 		// set text message
 		JMSMessage textMessage = new JMSMessage("test message");
 		// set bytes message
@@ -46,13 +50,13 @@ public class Main {
 			prod.send(bytesMessage);
 		}
 
-		// poll receive: pass factory, destination, transaction mode
-		try (JMSConsumer consumer = new JMSConsumer(factory, destination, true)) {
-			textMessage = consumer.poll(100);
+		// non-blocking poll: pass factory, destination, transaction mode
+		try (JMSConsumer consumer = new JMSConsumer(factory, destination, clientId, true, true, durableSubscriptionName)) {
+			textMessage = consumer.poll();
 		}
 
 		// thread receive: pass factory, destination, transaction mode
-		try (JMSConsumer consumer = new JMSConsumer(factory, destination, true)) {
+		try (JMSConsumer consumer = new JMSConsumer(factory, destination, clientId, true, true, durableSubscriptionName)) {
 			Thread thread = new Thread(consumer);
 			thread.start();
 			Thread.sleep(5000);

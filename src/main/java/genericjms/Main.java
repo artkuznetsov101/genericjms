@@ -50,12 +50,12 @@ public class Main {
 			prod.send(bytesMessage);
 		}
 
-		// non-blocking poll: pass factory, destination, transaction mode
+		// non-blocking poll
 		try (JMSConsumer consumer = new JMSConsumer(factory, destination, clientId, true, true, durableSubscriptionName)) {
 			textMessage = consumer.poll();
 		}
 
-		// thread receive: pass factory, destination, transaction mode
+		// thread receive
 		try (JMSConsumer consumer = new JMSConsumer(factory, destination, clientId, true, true, durableSubscriptionName)) {
 			Thread thread = new Thread(consumer);
 			thread.start();
